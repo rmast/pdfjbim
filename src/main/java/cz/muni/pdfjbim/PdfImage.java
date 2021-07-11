@@ -16,14 +16,10 @@
  */
 package cz.muni.pdfjbim;
 
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.IOException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.*;
 
 /**
  * class representing JBIG2 image in format suitable for pdf (without header,...)
@@ -35,7 +31,7 @@ public class PdfImage {
     private int objectNumber;
     private int generationNumber;
     private PdfImageInformation pdfImageInformation;
-    private File imageDataFile;
+    private final File imageDataFile;
     private static final Logger log = LoggerFactory.getLogger(PdfImage.class);
 
     /**
@@ -67,7 +63,7 @@ public class PdfImage {
      */
     public byte[] getImageData() throws PdfRecompressionException {
         Long sizeOfFile = imageDataFile.length();
-        int imageSize = 0;
+        int imageSize;
 
         DataInputStream inputData = null;
         log.debug("Getting image data from {}", imageDataFile);

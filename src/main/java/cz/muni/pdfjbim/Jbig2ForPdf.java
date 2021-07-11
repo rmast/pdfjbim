@@ -17,17 +17,11 @@
 
 package cz.muni.pdfjbim;
 
-import java.io.DataInput;
-import java.io.DataInputStream;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileNotFoundException;
-import java.io.FilenameFilter;
-import java.io.IOException;
-import java.util.*;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.*;
+import java.util.*;
 
 /**
  * class representing list of images compressed according to JBIG2 standard
@@ -40,7 +34,7 @@ public class Jbig2ForPdf {
 
     private byte[] globalData;
     private SortedMap<Integer, PdfImage> jbig2Images;
-    private List<File> jbFileNames = new ArrayList<File>();
+    private final List<File> jbFileNames = new ArrayList<File>();
     private static final Logger log = LoggerFactory.getLogger(Jbig2ForPdf.class);
 
     /**

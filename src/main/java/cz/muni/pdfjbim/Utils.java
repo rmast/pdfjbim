@@ -4,7 +4,6 @@
  */
 package cz.muni.pdfjbim;
 
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
@@ -18,7 +17,7 @@ public class Utils {
         if (listToSplit == null) {
             return null;
         }
-        Map <String,List<String> > splittedList = new TreeMap<String,List<String>>();
+        Map <String,List<String> > splittedList = new TreeMap<>();
         int start = 0;
         int basenameSuffix = 0;
         while (listToSplit.size() >= start+factor) {
@@ -37,7 +36,7 @@ public class Utils {
         if (listToSplit == null) {
             return null;
         }
-        Map <String,List<PdfImageInformation> > splittedList = new TreeMap<String,List<PdfImageInformation>>();
+        Map <String,List<PdfImageInformation> > splittedList = new TreeMap<>();
         int start = 0;
         int basenameSuffix = 0;
         while (listToSplit.size() >= start+factor) {

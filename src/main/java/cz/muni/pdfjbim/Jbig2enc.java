@@ -16,18 +16,14 @@
  */
 package cz.muni.pdfjbim;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.concurrent.ThreadFactory;
-
 import org.apache.commons.io.IOUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  *
@@ -43,7 +39,7 @@ public class Jbig2enc {
     private boolean useOcr = false; // enables OCR usage in jbig2enc
     private String lang = null; // sets language used by OCR engine (without effect if not enable use of OCR)
     private boolean forced = false; // forces ocr usage even for unknown resolution
-    private boolean segment = false; // puts images separatelly (jbig2enc option -S)
+    private final boolean segment = false; // puts images separatelly (jbig2enc option -S)
 
     public Jbig2enc(String jbig2enc) {
         if (jbig2enc == null) {
@@ -148,7 +144,7 @@ public class Jbig2enc {
         }
 
 
-        List<String> toRun = new ArrayList<String>();
+        List<String> toRun = new ArrayList<>();
 
         toRun.add(jbig2enc);
         toRun.add("-s");
@@ -168,7 +164,7 @@ public class Jbig2enc {
             toRun.add("--auto-thresh");
 
             if (useOcr) {
-                toRun.add("--use-ocr");
+                toRun.add("--useOcr");
                 if (lang != null) {
                     toRun.add("--lang");
                     toRun.add(lang);
@@ -200,6 +196,7 @@ public class Jbig2enc {
             int exitValue = pr1.waitFor();
 
             if (exitValue != 0) {
+            	log.warn("Executing {}", toRun);
                 log.warn("jbig2enc ended with error " + exitValue);
                 Tools.deleteFilesFromList(imageList);
                 throw new PdfRecompressionException("jbig2enc ended with error " + exitValue);
@@ -214,3 +211,4 @@ public class Jbig2enc {
         }
     }
 }
+

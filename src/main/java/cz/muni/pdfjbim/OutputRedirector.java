@@ -34,6 +34,7 @@ public class OutputRedirector extends Thread {
             String line;
 
             while ((line = reader.readLine()) != null) {
+System.out.println(line);
                 writer.write(line);
                 log.debug(line);
             }
