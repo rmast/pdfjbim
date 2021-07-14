@@ -1,5 +1,3 @@
-package cz.muni.pdfjbim.pdf;
-
 /*
  * Licensed to the Apache Software Foundation (ASF) under one or more
  * contributor license agreements.  See the NOTICE file distributed with
@@ -17,8 +15,7 @@ package cz.muni.pdfjbim.pdf;
  * limitations under the License.
  */
 //package org.apache.pdfbox.tools;
-
-// This is the official 2.0.24 version copied from https://svn.apache.org/viewvc/pdfbox/tags/2.0.24/tools/src/main/java/org/apache/pdfbox/tools/ExtractImages.java?revision=1890567&view=co&pathrev=1890567
+package cz.muni.pdfjbim;
 
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
@@ -26,11 +23,16 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.PrintStream;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.concurrent.Callable;
 
+import org.apache.commons.io.FilenameUtils;
+import org.apache.pdfbox.Loader;
 import org.apache.pdfbox.contentstream.PDFGraphicsStreamEngine;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.cos.COSStream;
@@ -50,147 +52,87 @@ import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.apache.pdfbox.pdmodel.graphics.pattern.PDAbstractPattern;
 import org.apache.pdfbox.pdmodel.graphics.pattern.PDTilingPattern;
 import org.apache.pdfbox.pdmodel.graphics.state.PDExtendedGraphicsState;
+import org.apache.pdfbox.pdmodel.graphics.state.PDGraphicsState;
 import org.apache.pdfbox.pdmodel.graphics.state.PDSoftMask;
 import org.apache.pdfbox.pdmodel.graphics.state.RenderingMode;
 import org.apache.pdfbox.tools.imageio.ImageIOUtil;
 import org.apache.pdfbox.util.Matrix;
 import org.apache.pdfbox.util.Vector;
 
+import picocli.CommandLine;
+import picocli.CommandLine.Command;
+import picocli.CommandLine.Option;
+
 /**
  * Extracts the images from a PDF file.
  *
  * @author Ben Litchfield
  */
-public final class ExtractImages
+@Command(name = "extractimages", header = "Extracts the images from a PDF document", versionProvider = Version.class, mixinStandardHelpOptions = true)
+public final class ExtractImages implements Callable<Integer>
 {
-    @SuppressWarnings({"squid:S2068"})
-    private static final String PASSWORD = "-password";
-    private static final String PREFIX = "-prefix";
-    private static final String DIRECTJPEG = "-directJPEG";
-    private static final String NOCOLORCONVERT = "-noColorConvert";
+    // Expected for CLI app to write to System.out/System.err
+    @SuppressWarnings("squid:S106")
+    private static final PrintStream SYSOUT = System.out;
+    @SuppressWarnings("squid:S106")
+    private static final PrintStream SYSERR = System.err;
 
     private static final List<String> JPEG = Arrays.asList(
             COSName.DCT_DECODE.getName(),
             COSName.DCT_DECODE_ABBREVIATION.getName());
 
+    @Option(names = "-password", description = "the password for the PDF or certificate in keystore.", arity = "0..1", interactive = true)
+    private String password;
+
+    @Option(names = "-prefix", description = "the image prefix (default to pdf name).")
+    private String prefix;
+
+    @Option(names = "-useDirectJPEG", description = "Forces the direct extraction of JPEG/JPX images " +
+            "regardless of colorspace or masking.")
     private boolean useDirectJPEG;
+
+    @Option(names = "-includeDensity", description = "Include picture density " +
+            "calculated from scale in PDF. (does not work with -useDirectJPEG or -noColorConvert")
+    private boolean includeDensity;
+
+    @Option(names = "-noColorConvert", description = "Images are extracted with their " +
+            "original colorspace if possible.")
     private boolean noColorConvert;
-    private String filePrefix;
 
-    private final Set<COSStream> seen = new HashSet<COSStream>();
+    @Option(names = {"-i", "--input"}, description = "the PDF file", required = true)
+    private File infile;
+
+    private final Set<COSStream> seen = new HashSet<>();
     private int imageCounter = 1;
-
-    private ExtractImages()
-    {
-    }
 
     /**
      * Entry point for the application.
      *
      * @param args The command-line arguments.
-     * @throws IOException if there is an error reading the file or extracting the images.
      */
-    public static void main(String[] args) throws IOException
+    public static void main(String[] args)
     {
         // suppress the Dock icon on OS X
         System.setProperty("apple.awt.UIElement", "true");
 
-        ExtractImages extractor = new ExtractImages();
-        extractor.run(args);
+        int exitCode = new CommandLine(new ExtractImages()).execute(args);
+        System.exit(exitCode);
     }
 
-    private void run(String[] args) throws IOException
+    public Integer call()
     {
-        if (args.length < 1 || args.length > 4)
+        try (PDDocument document = Loader.loadPDF(infile, password))
         {
-            usage();
-        }
-        else
-        {
-            String pdfFile = null;
-            @SuppressWarnings({"squid:S2068"})
-            String password = "";
-            for(int i = 0; i < args.length; i++)
-            {
-                if (args[i].equals(PASSWORD))
-                {
-                    i++;
-                    if (i >= args.length)
-                    {
-                        usage();
-                    }
-                    password = args[i];
-                }
-                else if (args[i].equals(PREFIX))
-                {
-                    i++;
-                    if (i >= args.length)
-                    {
-                        usage();
-                    }
-                    filePrefix = args[i];
-                }
-                else if (args[i].equals(DIRECTJPEG))
-                {
-                    useDirectJPEG = true;
-                }
-                else if (args[i].equals(NOCOLORCONVERT))
-                {
-                    noColorConvert = true;
-                }
-                else
-                {
-                    if (pdfFile == null)
-                    {
-                        pdfFile = args[i];
-                    }
-                }
-            }
-            if (pdfFile == null)
-            {
-                usage();
-            }
-            else
-            {
-                if (filePrefix == null && pdfFile.length() > 4)
-                {
-                    filePrefix = pdfFile.substring(0, pdfFile.length() - 4);
-                }
-
-                extract(pdfFile, password);
-            }
-        }
-    }
-
-    /**
-     * Print the usage requirements and exit.
-     */
-    private static void usage()
-    {
-        String message = "Usage: java " + ExtractImages.class.getName() + " [options] <inputfile>\n"
-                + "\nOptions:\n"
-                + "  -password <password>   : Password to decrypt document\n"
-                + "  -prefix <image-prefix> : Image prefix (default to pdf name)\n"
-                + "  -directJPEG            : Forces the direct extraction of JPEG/JPX images \n"
-                + "                           regardless of colorspace or masking\n"
-                + "  -noColorConvert        : Images are extracted with their \n"
-                + "                           original colorspace if possible.\n"
-                + "  <inputfile>            : The PDF document to use\n";
-
-        System.err.println(message);
-        System.exit(1);
-    }
-
-    private void extract(String pdfFile, String password) throws IOException
-    {
-        PDDocument document = null;
-        try
-        {
-            document = PDDocument.load(new File(pdfFile), password);
             AccessPermission ap = document.getCurrentAccessPermission();
-            if (! ap.canExtractContent())
+            if (!ap.canExtractContent())
             {
-                throw new IOException("You do not have permission to extract images");
+                SYSERR.println("You do not have permission to extract images");
+                return 1;
+            }
+
+            if (prefix == null)
+            {
+                prefix = FilenameUtils.removeExtension(infile.getAbsolutePath());
             }
 
             for (PDPage page : document.getPages())
@@ -199,13 +141,12 @@ public final class ExtractImages
                 extractor.run();
             }
         }
-        finally
+        catch (IOException ioe)
         {
-            if (document != null)
-            {
-                document.close();
-            }
+            SYSERR.println("Error extracting images [" + ioe.getClass().getSimpleName() + "]: " + ioe.getMessage());
+            return 4;
         }
+        return 0;
     }
 
     private class ImageGraphicsEngine extends PDFGraphicsStreamEngine
@@ -229,7 +170,7 @@ public final class ExtractImages
                 PDExtendedGraphicsState extGState = res.getExtGState(name);
                 if (extGState == null)
                 {
-                    // can happen if key exists but no value
+                    // can happen if key exists but no value 
                     continue;
                 }
                 PDSoftMask softMask = extGState.getSoftMask();
@@ -266,43 +207,42 @@ public final class ExtractImages
             }
 
             // save image
-            String name = filePrefix + "-" + imageCounter;
+            String name = prefix + "-" + imageCounter;
             imageCounter++;
 
-            System.out.println("Writing image: " + name);
-            write2file(pdImage, name, useDirectJPEG, noColorConvert);
+            write2file(pdImage, name, useDirectJPEG, noColorConvert, includeDensity);
         }
 
         @Override
         public void appendRectangle(Point2D p0, Point2D p1, Point2D p2, Point2D p3)
                 throws IOException
         {
-
+            // Empty: add special handling if needed
         }
 
         @Override
         public void clip(int windingRule) throws IOException
         {
-
+            // Empty: add special handling if needed
         }
 
         @Override
         public void moveTo(float x, float y) throws IOException
         {
-
+            // Empty: add special handling if needed
         }
 
         @Override
         public void lineTo(float x, float y) throws IOException
         {
-
+            // Empty: add special handling if needed
         }
 
         @Override
         public void curveTo(float x1, float y1, float x2, float y2, float x3, float y3)
                 throws IOException
         {
-
+            // Empty: add special handling if needed
         }
 
         @Override
@@ -314,13 +254,13 @@ public final class ExtractImages
         @Override
         public void closePath() throws IOException
         {
-
+            // Empty: add special handling if needed
         }
 
         @Override
         public void endPath() throws IOException
         {
-
+            // Empty: add special handling if needed
         }
 
         @Override
@@ -329,14 +269,15 @@ public final class ExtractImages
                                  int code,
                                  Vector displacement) throws IOException
         {
-            RenderingMode renderingMode = getGraphicsState().getTextState().getRenderingMode();
+            PDGraphicsState graphicsState = getGraphicsState();
+            RenderingMode renderingMode = graphicsState.getTextState().getRenderingMode();
             if (renderingMode.isFill())
             {
-                processColor(getGraphicsState().getNonStrokingColor());
+                processColor(graphicsState.getNonStrokingColor());
             }
             if (renderingMode.isStroke())
             {
-                processColor(getGraphicsState().getStrokingColor());
+                processColor(graphicsState.getStrokingColor());
             }
         }
 
@@ -361,7 +302,7 @@ public final class ExtractImages
         @Override
         public void shadingFill(COSName shadingName) throws IOException
         {
-
+            // Empty: add special handling if needed
         }
 
         // find out if it is a tiling pattern, then process that one
@@ -391,8 +332,29 @@ public final class ExtractImages
          * @throws IOException When something is wrong with the corresponding file.
          */
         private void write2file(PDImage pdImage, String prefix, boolean directJPEG,
-                                boolean noColorConvert) throws IOException
+                                boolean noColorConvert, boolean includeDensity) throws IOException
         {
+            Matrix ctm = getGraphicsState().getCurrentTransformationMatrix();
+            float imageScale = ctm.getScalingFactorX() + ctm.getScalingFactorY();
+            int dpi = (int) ((pdImage.getWidth() + pdImage.getHeight()) * 72 / imageScale);
+
+//          Round calculated dpi to nearest credible scanning resolution
+//          This table hasn't been thoroughly tested, only with a big document containing many little 200 dpi pictures.
+//          Should it be user configurable, like with a list in a command-line parameter of nearest values to stick to?
+
+//          As the used writeImage method doesn't support separate X and Y dpi fax dpi's like 203x98 aren't included
+//          anyway and need a separate construction. The upcoming apache.commons.imaging could provide for
+//          a lossless, more speedy alternative for modifying metadata density chunks like EXIF JFIF & PhYS, or would
+//          including an external tool like mogrify/identify from ImageMagick be acceptable?
+
+            switch (dpi){
+                case 599 : dpi = 600; break;
+                case 299 : dpi = 300; break;
+                case 199 : dpi = 200; break;
+                case 149 : dpi = 150; break;
+                case 99  : dpi = 100; break;
+            }
+
             String suffix = pdImage.getSuffix();
             if (suffix == null || "jb2".equals(suffix))
             {
@@ -410,43 +372,45 @@ public final class ExtractImages
                 suffix = "png";
             }
 
-            FileOutputStream out = null;
-            try
+            if (noColorConvert)
             {
-                if (noColorConvert)
+                // We write the raw image if in any way possible.
+                // But we have no alpha information here.
+                BufferedImage image = pdImage.getRawImage();
+                if (image != null)
                 {
-                    // We write the raw image if in any way possible.
-                    // But we have no alpha information here.
-                    BufferedImage image = pdImage.getRawImage();
-                    if (image != null)
+                    int elements = image.getRaster().getNumDataElements();
+                    suffix = "png";
+                    if (elements > 3)
                     {
-                        int elements = image.getRaster().getNumDataElements();
-                        suffix = "png";
-                        if (elements > 3)
-                        {
-                            // More then 3 channels: Thats likely CMYK. We use tiff here,
-                            // but a TIFF codec must be in the class path for this to work.
-                            suffix = "tiff";
-                        }
-                        out = new FileOutputStream(prefix + "." + suffix);
-                        ImageIOUtil.writeImage(image, suffix, out);
-                        out.flush();
-                        out.close();
-                        return;
+                        // More then 3 channels: Thats likely CMYK. We use tiff here,
+                        // but a TIFF codec must be in the class path for this to work.
+                        suffix = "tiff";
                     }
+                    try (FileOutputStream imageOutput = new FileOutputStream(prefix + "." + suffix))
+                    {
+                        SYSOUT.println("Writing image: " + prefix + "." + suffix);
+                        ImageIOUtil.writeImage(image, suffix, imageOutput, dpi);
+                        imageOutput.flush();
+                    }
+                    return;
                 }
+            }
 
-                out = new FileOutputStream(prefix + "." + suffix);
+            try (FileOutputStream imageOutput = new FileOutputStream(prefix + "." + suffix))
+            {
+                SYSOUT.println("Writing image: " + prefix + "." + suffix);
+
                 if ("jpg".equals(suffix))
                 {
                     String colorSpaceName = pdImage.getColorSpace().getName();
-                    if (directJPEG
-                            || (PDDeviceGray.INSTANCE.getName().equals(colorSpaceName)
-                            || PDDeviceRGB.INSTANCE.getName().equals(colorSpaceName)))
+                    if (!includeDensity && (directJPEG ||
+                            (PDDeviceGray.INSTANCE.getName().equals(colorSpaceName) ||
+                                    PDDeviceRGB.INSTANCE.getName().equals(colorSpaceName))))
                     {
                         // RGB or Gray colorspace: get and write the unmodified JPEG stream
                         InputStream data = pdImage.createInputStream(JPEG);
-                        IOUtils.copy(data, out);
+                        IOUtils.copy(data, imageOutput);
                         IOUtils.closeQuietly(data);
                     }
                     else
@@ -455,21 +419,21 @@ public final class ExtractImages
                         BufferedImage image = pdImage.getImage();
                         if (image != null)
                         {
-                            ImageIOUtil.writeImage(image, suffix, out);
+                            ImageIOUtil.writeImage(image, suffix, imageOutput, dpi);
                         }
                     }
                 }
                 else if ("jp2".equals(suffix))
                 {
                     String colorSpaceName = pdImage.getColorSpace().getName();
-                    if (directJPEG ||
-                            (PDDeviceGray.INSTANCE.getName().equals(colorSpaceName) ||
-                                    PDDeviceRGB.INSTANCE.getName().equals(colorSpaceName)))
+                    if (!includeDensity && (directJPEG
+                            || (PDDeviceGray.INSTANCE.getName().equals(colorSpaceName)
+                            || PDDeviceRGB.INSTANCE.getName().equals(colorSpaceName))))
                     {
                         // RGB or Gray colorspace: get and write the unmodified JPEG2000 stream
                         InputStream data = pdImage.createInputStream(
-                                Arrays.asList(COSName.JPX_DECODE.getName()));
-                        IOUtils.copy(data, out);
+                                Collections.singletonList(COSName.JPX_DECODE.getName()));
+                        IOUtils.copy(data, imageOutput);
                         IOUtils.closeQuietly(data);
                     }
                     else
@@ -478,7 +442,7 @@ public final class ExtractImages
                         BufferedImage image = pdImage.getImage();
                         if (image != null)
                         {
-                            ImageIOUtil.writeImage(image, "jpeg2000", out);
+                            ImageIOUtil.writeImage(image, "jpeg2000", imageOutput, dpi);
                         }
                     }
                 }
@@ -503,24 +467,17 @@ public final class ExtractImages
                             bitonalImage.setRGB(x, y, image.getRGB(x, y));
                         }
                     }
-                    ImageIOUtil.writeImage(bitonalImage, suffix, out);
+                    ImageIOUtil.writeImage(bitonalImage, suffix, imageOutput, dpi);
                 }
                 else
                 {
                     BufferedImage image = pdImage.getImage();
                     if (image != null)
                     {
-                        ImageIOUtil.writeImage(image, suffix, out);
+                        ImageIOUtil.writeImage(image, suffix, imageOutput, dpi);
                     }
                 }
-                out.flush();
-            }
-            finally
-            {
-                if (out != null)
-                {
-                    out.close();
-                }
+                imageOutput.flush();
             }
         }
 
