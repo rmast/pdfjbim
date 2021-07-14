@@ -25,9 +25,13 @@ import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSDocument;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.cos.COSObject;
+import org.apache.pdfbox.io.RandomAccessRead;
 import org.apache.pdfbox.pdfparser.PDFParser;
+import org.apache.pdfbox.tools.imageio.ImageIOUtil;
+import org.apache.pdfbox.pdmodel.PDResources;
 import org.apache.pdfbox.pdmodel.common.PDStream;
-import org.apache.pdfbox.pdmodel.graphics.xobject.PDXObjectImage;
+//import org.apache.pdfbox.pdmodel.graphics.xobject.PDImageXObject;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -162,7 +166,7 @@ log.info("extractImages 4");
         PDFParser parser;
         COSDocument doc = null;
         try {
-            parser = new PDFParser(inputStream);
+            parser = new PDFParser((RandomAccessRead) inputStream);
             parser.parse();
             doc = parser.getDocument();
 
@@ -182,54 +186,57 @@ log.info("extractImages 4");
                         } else {
                             key = "im0";
                         }
-                        int objectNum = obj.getObjectNumber().intValue();
-                        int genNum = obj.getGenerationNumber().intValue();
-                        PDXObjectImage image = (PDXObjectImage) PDXObjectImage.createXObject(imageObj);
+                        int objectNum = (int) obj.getObjectNumber();
+                        int genNum = obj.getGenerationNumber();
+                        //PDResources resources = doc..getResources();
+                        PDImageXObject image = (PDImageXObject) PDImageXObject.createXObject(imageObj,null);
 
-                        PDStream pdStr = new PDStream(image.getCOSStream());
-                        List<COSName> filters = pdStr.getFilters();
+                        //PDStream pdStr =
+
+//                                InputStream is = image.getCOSObject().getCOSStream(cosNameObj).createRawInputStream();
+//                        List<COSName> filters = pdStr.getFilters();
 
                         log.debug("Detected image with color depth: {} bits", image.getBitsPerComponent());
-                        if (filters == null) {
-                            continue;
-                        }
-                        log.debug("Detected filters: {}", filters);
-
-
-                        if ((image.getBitsPerComponent() > 1) && (!binarize)) {
-                            log.info("It is not a bitonal image => skipping");
-                            continue;
-                        }
-
-                        // at this moment for preventing bad output (bad coloring) from LZWDecode filter
-                        if (filters.contains(COSName.LZW_DECODE)) {
-                            log.info("This is LZWDecoded => skipping");
-                            continue;
-                        }
-
-                        if (filters.contains(COSName.FLATE_DECODE)) {
-                            log.debug("FlateDecoded image detected");
-                        }
-
-                        if (filters.contains(COSName.JBIG2_DECODE)) {
-                            if (skipJBig2Images) {
-                                log.warn("Allready compressed according to JBIG2 standard => skipping");
-                                continue;
-                            } else {
-                                log.debug("JBIG2 image detected");
-                            }
-                        }
-
-                        // detection of unsupported filters by pdfBox library
-                        if (filters.contains(COSName.JPX_DECODE)) {
-                            log.warn("Unsupported filter JPXDecode => skipping");
-                            continue;
-                        }
+//                        if (filters == null) {
+//                            continue;
+//                        }
+//                        log.debug("Detected filters: {}", filters);
+//
+//
+//                        if ((image.getBitsPerComponent() > 1) && (!binarize)) {
+//                            log.info("It is not a bitonal image => skipping");
+//                            continue;
+//                        }
+//
+//                        // at this moment for preventing bad output (bad coloring) from LZWDecode filter
+//                        if (filters.contains(COSName.LZW_DECODE)) {
+//                            log.info("This is LZWDecoded => skipping");
+//                            continue;
+//                        }
+//
+//                        if (filters.contains(COSName.FLATE_DECODE)) {
+//                            log.debug("FlateDecoded image detected");
+//                        }
+//
+//                        if (filters.contains(COSName.JBIG2_DECODE)) {
+//                            if (skipJBig2Images) {
+//                                log.warn("Allready compressed according to JBIG2 standard => skipping");
+//                                continue;
+//                            } else {
+//                                log.debug("JBIG2 image detected");
+//                            }
+//                        }
+//
+//                        // detection of unsupported filters by pdfBox library
+//                        if (filters.contains(COSName.JPX_DECODE)) {
+//                            log.warn("Unsupported filter JPXDecode => skipping");
+//                            continue;
+//                        }
 
                         String name = getUniqueFileName(prefix, image.getSuffix());
                         log.info("Writing image: {}", name);
-                        image.write2file(name);
-
+//                        image.write2file(name);
+//                        image.writeImage(image,                                 filename,int dpi)
 
                         PdfImageInformation pdfImageInfo =
                                 new PdfImageInformation(key, image.getWidth(), image.getHeight(), objectNum, genNum);

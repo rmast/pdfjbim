@@ -27,7 +27,7 @@
         <version.javadoc-plugin>2.9.1</version.javadoc-plugin>
         <version.release-plugin>2.5</version.release-plugin>
 
-        <version.pdfbox>1.8.10</version.pdfbox>
+        <version.pdfbox>2.0.24</version.pdfbox>
         <version.bouncycastle>1.46</version.bouncycastle>
         <version.icu>4.8.1</version.icu>
         <version.itext>5.5.8</version.itext>
@@ -58,7 +58,7 @@
         <version.org.codehaus.mojo.findbugs-maven-plugin>2.5.5</version.org.codehaus.mojo.findbugs-maven-plugin>
         <version.org.codehaus.mojo.findbugs-maven-plugin_java8>3.0.1</version.org.codehaus.mojo.findbugs-maven-plugin_java8>
 
-        <version.java>1.8</version.java>
+        <version.java>11</version.java>
 
     </properties>
 
@@ -113,6 +113,14 @@
             <artifactId>pdfbox</artifactId>
             <version>${version.pdfbox}</version>
         </dependency>
+        <dependency>
+            <groupId>com.github.jai-imageio</groupId>
+            <artifactId>jai-imageio-core</artifactId>
+            <version>1.3.0</version>
+        </dependency>
+
+
+
 
         <dependency>
             <groupId>org.bouncycastle</groupId>
@@ -177,6 +185,11 @@
             <version>${version.junit}</version>
             <scope>test</scope>
             <type>jar</type>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.pdfbox</groupId>
+            <artifactId>pdfbox-app</artifactId>
+            <version>2.0.24</version>
         </dependency>
     </dependencies>
 
