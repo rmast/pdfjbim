@@ -23,13 +23,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
-import java.util.Arrays;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Set;
+import java.util.*;
 
 import org.apache.pdfbox.contentstream.PDFGraphicsStreamEngine;
 import org.apache.pdfbox.cos.COSName;
+import org.apache.pdfbox.cos.COSObject;
+import org.apache.pdfbox.cos.COSObjectKey;
 import org.apache.pdfbox.cos.COSStream;
 import org.apache.pdfbox.io.IOUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
@@ -77,8 +76,13 @@ public final class ExtractImages
     private boolean noColorConvert;
     private String filePrefix;
 
-    private final Set<COSStream> seen = new HashSet<COSStream>();
+    private final Set<COSStream> seen = new HashSet<>();
     private int imageCounter = 1;
+    private String key; // RM: Hier moet een key in.
+    private final List<String> namesOfImages = new ArrayList<>();
+    private final List<PdfImageInformation> originalImageInformations = new ArrayList<>();
+    HashSet<COSObjectKey> listOfKeys = new HashSet<>();
+
 
     private ExtractImages()
     {
@@ -198,12 +202,18 @@ public final class ExtractImages
             {
                 throw new IOException("You do not have permission to extract images");
             }
-
+            List<COSObject> lCosObj = document.getDocument().getObjects();
+            for (COSObject cosObject : lCosObj) {
+                if (cosObject.getObject() instanceof COSStream) {
+                    listOfKeys.add(new COSObjectKey(cosObject.getObjectNumber(), cosObject.getGenerationNumber()));
+                }
+            }
             for (PDPage page : document.getPages())
             {
                 ImageGraphicsEngine extractor = new ImageGraphicsEngine(page);
                 extractor.run();
             }
+
         }
         finally
         {
@@ -548,6 +558,13 @@ public final class ExtractImages
                     out.close();
                 }
             }
+
+            PdfImageInformation pdfImageInfo =
+                    new PdfImageInformation(key, pdImage.getWidth(), pdImage.getHeight(), 0,0);
+            originalImageInformations.add(pdfImageInfo);
+
+            namesOfImages.add(prefix + "." + suffix);
+
         }
 
         private boolean hasMasks(PDImage pdImage) throws IOException

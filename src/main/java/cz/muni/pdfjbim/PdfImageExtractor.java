@@ -139,68 +139,68 @@ log.info("extractImages 4");
      * @throws PdfRecompressionException if problem to extract images from PDF
      */
     public void extractImagesUsingPdfParser(InputStream is, String prefix, String password, Set<Integer> pagesToProcess,
-            Boolean binarize) throws PdfRecompressionException {
-        // checking arguments and setting appropriate variables
-        if (binarize == null) {
-            binarize = false;
-        }
-
-        log.debug("Extracting images (binarize set to {})", binarize);
-
-        InputStream inputStream;
-        if (password != null) {
-            try (ByteArrayOutputStream decryptedOutputStream = new ByteArrayOutputStream()) {
-                PdfReader reader = new PdfReader(is, password.getBytes(StandardCharsets.UTF_8));
-                PdfStamper stamper = new PdfStamper(reader, decryptedOutputStream);
-                stamper.close();
-                inputStream = new ByteArrayInputStream(decryptedOutputStream.toByteArray());
-            } catch (DocumentException ex) {
-                throw new PdfRecompressionException(ex);
-            } catch (IOException ex) {
-                throw new PdfRecompressionException("Reading file caused exception", ex);
-            }
-        } else {
-            inputStream = is;
-        }
-
-        PDFParser parser;
-        COSDocument doc = null;
-        try {
-            parser = new PDFParser((RandomAccessRead) inputStream);
-            parser.parse();
-            doc = parser.getDocument();
-
-
-            List<COSObject> objs = doc.getObjectsByType(COSName.XOBJECT);
-            if (objs != null) {
-                for (COSObject obj : objs) {
-                    COSBase subtype = obj.getItem(COSName.SUBTYPE);
-                    if (subtype.toString().equalsIgnoreCase("COSName{Image}")) {
-                        COSBase imageObj = obj.getObject();
-                        COSBase cosNameObj = obj.getItem(COSName.NAME);
-                        String key;
-                        if (cosNameObj != null) {
-                            String cosNameKey = cosNameObj.toString();
-                            int startOfKey = cosNameKey.indexOf("{") + 1;
-                            key = cosNameKey.substring(startOfKey, cosNameKey.length() - 1);
-                        } else {
-                            key = "im0";
-                        }
-                        int objectNum = (int) obj.getObjectNumber();
-                        int genNum = obj.getGenerationNumber();
-                        //PDResources resources = doc..getResources();
-                        PDImageXObject image = (PDImageXObject) PDImageXObject.createXObject(imageObj,null);
-
-                        //PDStream pdStr =
-
-//                                InputStream is = image.getCOSObject().getCOSStream(cosNameObj).createRawInputStream();
+                                            Boolean binarize) throws PdfRecompressionException {
+//        // checking arguments and setting appropriate variables
+//        if (binarize == null) {
+//            binarize = false;
+//        }
+//
+//        log.debug("Extracting images (binarize set to {})", binarize);
+//
+//        InputStream inputStream = null;
+//        if (password != null) {
+//            try (ByteArrayOutputStream decryptedOutputStream = new ByteArrayOutputStream()) {
+//                PdfReader reader = new PdfReader(is, password.getBytes(StandardCharsets.UTF_8));
+//                PdfStamper stamper = new PdfStamper(reader, decryptedOutputStream);
+//                if (stamper != null) {
+//                    stamper.close();
+//                }
+//                inputStream = new ByteArrayInputStream(decryptedOutputStream.toByteArray());
+//            } catch (DocumentException ex) {
+//                throw new PdfRecompressionException(ex);
+//            } catch (IOException ex) {
+//                throw new PdfRecompressionException("Reading file caused exception", ex);
+//            }
+//        } else {
+//            inputStream = is;
+//        }
+//
+//
+//        PDFParser parser = null;
+//        COSDocument doc = null;
+//        try {
+//            parser = new PDFParser(inputStream);
+//            parser.parse();
+//            doc = parser.getDocument();
+//
+//
+//            List<COSObject> objs = doc.getObjectsByType(COSName.XOBJECT);
+//            if (objs != null) {
+//                for (COSObject obj : objs) {
+//                    COSBase subtype = obj.getItem(COSName.SUBTYPE);
+//                    if (subtype.toString().equalsIgnoreCase("COSName{Image}")) {
+//                        COSBase imageObj = obj.getObject();
+//                        COSBase cosNameObj = obj.getItem(COSName.NAME);
+//                        String key;
+//                        if (cosNameObj != null) {
+//                            String cosNameKey = cosNameObj.toString();
+//                            int startOfKey = cosNameKey.indexOf("{") + 1;
+//                            key = cosNameKey.substring(startOfKey, cosNameKey.length() - 1);
+//                        } else {
+//                            key = "im0";
+//                        }
+//                        int objectNum = obj.getObjectNumber().intValue();
+//                        int genNum = obj.getGenerationNumber().intValue();
+//                        PDXObjectImage image = (PDXObjectImage) PDXObjectImage.createXObject(imageObj);
+//
+//                        PDStream pdStr = new PDStream(image.getCOSStream());
 //                        List<COSName> filters = pdStr.getFilters();
-
-                        log.debug("Detected image with color depth: {} bits", image.getBitsPerComponent());
+//
+//                        log.debug("Detected image with color depth: {} bits", image.getBitsPerComponent());
 //                        if (filters == null) {
 //                            continue;
 //                        }
-//                        log.debug("Detected filters: {}", filters);
+//                        log.debug("Detected filters: {}", filters.toString());
 //
 //
 //                        if ((image.getBitsPerComponent() > 1) && (!binarize)) {
@@ -232,36 +232,35 @@ log.info("extractImages 4");
 //                            log.warn("Unsupported filter JPXDecode => skipping");
 //                            continue;
 //                        }
-
-                        String name = getUniqueFileName(prefix, image.getSuffix());
-                        log.info("Writing image: {}", name);
+//
+//                        String name = getUniqueFileName(prefix, image.getSuffix());
+//                        log.info("Writing image: {}", name);
 //                        image.write2file(name);
-//                        image.writeImage(image,                                 filename,int dpi)
-
-                        PdfImageInformation pdfImageInfo =
-                                new PdfImageInformation(key, image.getWidth(), image.getHeight(), objectNum, genNum);
-                                    log.info("Image width {}, height {} (regel 404)\n", new Object[] {image.getWidth(), image.getHeight()});
-                        originalImageInformations.add(pdfImageInfo);
-
-                        namesOfImages.add(name + "." + image.getSuffix());
-
-                    }
-                }
-            }
-        } catch (IOException ex) {
-            Tools.deleteFilesFromList(namesOfImages);
-            throw new PdfRecompressionException("Unable to parse PDF document", ex);
-        } catch (Exception ex) {
-            Tools.deleteFilesFromList(namesOfImages);
-        } finally {
-            if (doc != null) {
-                try {
-                    doc.close();
-                } catch (IOException ex) {
-                    throw new PdfRecompressionException(ex);
-                }
-            }
-        }
+//
+//
+//                        PdfImageInformation pdfImageInfo =
+//                                new PdfImageInformation(key, image.getWidth(), image.getHeight(), objectNum, genNum);
+//                        originalImageInformations.add(pdfImageInfo);
+//
+//                        namesOfImages.add(name + "." + image.getSuffix());
+//
+//                    }
+//                }
+//            }
+//        } catch (IOException ex) {
+//            Tools.deleteFilesFromList(namesOfImages);
+//            throw new PdfRecompressionException("Unable to parse PDF document", ex);
+//        } catch (Exception ex) {
+//            Tools.deleteFilesFromList(namesOfImages);
+//        } finally {
+//            if (doc != null) {
+//                try {
+//                    doc.close();
+//                } catch (IOException ex) {
+//                    throw new PdfRecompressionException(ex);
+//                }
+//            }
+//        }
     }
 
 

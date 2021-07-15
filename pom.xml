@@ -58,7 +58,7 @@
         <version.org.codehaus.mojo.findbugs-maven-plugin>2.5.5</version.org.codehaus.mojo.findbugs-maven-plugin>
         <version.org.codehaus.mojo.findbugs-maven-plugin_java8>3.0.1</version.org.codehaus.mojo.findbugs-maven-plugin_java8>
 
-        <version.java>11</version.java>
+        <version.java>1.8</version.java>
 
     </properties>
 
