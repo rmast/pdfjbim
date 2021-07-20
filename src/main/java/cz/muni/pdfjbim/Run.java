@@ -37,7 +37,7 @@ public class Run {
      * @param args the command line arguments
      * @throws PdfRecompressionException
      */
-    public static void main(String[] args) throws PdfRecompressionException {
+    public static void main(String[] args) throws PdfRecompressionException, IOException {
         if (args.length < 4) {
             usage();
         }
@@ -234,18 +234,24 @@ public class Run {
         long sizeOfInputPdf = new File(pdfFile).length();
         double startTime = System.currentTimeMillis();
 
-        // PdfImageExtractor handles extraction of pdf and putting recompressed images
-        PdfImageExtractor imageExtractor = new PdfImageExtractor();
-
-        // image extraction
-        imageExtractor.extractImages(pdfFile, password, pagesToProcess, binarize);
+//        // PdfImageExtractor handles extraction of pdf and putting recompressed images
+//        PdfImageExtractor imageExtractor = new PdfImageExtractor();
+//
+//        // image extraction
+//        imageExtractor.extractImages(pdfFile, password, pagesToProcess, binarize);
+        ExtractImages extractImages = new ExtractImages();
+        extractImages.extract(pdfFile, password);
 //        imageExtractor.extractImagesUsingPdfObjectAccess(pdfFile, null, password, pagesToProcess, binarize);
 
         // returns names of extracted images as List
-        List<String> jbig2encInputImages = imageExtractor.getNamesOfImages();
+        List<String> jbig2encInputImages =  new ArrayList<String>();; //= imageExtractor.getNamesOfImages();
 
         // getting informations about images that were in PDF such as dimension, position in PDF,...
-        List<PdfImageInformation> pdfImagesInfo = imageExtractor.getOriginalImageInformations();
+        List<PdfImageInformation> pdfImagesInfo = extractImages.originalImageInformations;
+        for (PdfImageInformation imageInformation : pdfImagesInfo) {
+            jbig2encInputImages.add(imageInformation.getFileName());
+        }
+//        List<PdfImageInformation> pdfImagesInfo = imageExtractor.getOriginalImageInformations();
         List<Jbig2ForPdf> pdfImagesAsList = new ArrayList<Jbig2ForPdf>();
         if (jbig2encInputImages.isEmpty()) {
             if (!silent) {

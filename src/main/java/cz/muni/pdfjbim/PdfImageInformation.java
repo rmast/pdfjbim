@@ -29,8 +29,9 @@ public class PdfImageInformation {
     private final int width;
     private final int height;
     private int pageNumber;
-    private int objectNum;
+    private long objectNum;
     private int objectGenNum;
+    private String fileName;
 
 
     /**
@@ -42,7 +43,7 @@ public class PdfImageInformation {
      * @param genNum 
      * @param pageNumber represents page number in original pdf dokument
      */
-    public PdfImageInformation(String key, int width, int height, int objectNum, int genNum, int pageNumber) {
+    public PdfImageInformation(String key, int width, int height, long objectNum, int genNum, int pageNumber) {
         this.key = key;
         this.width = width;
         this.height = height;
@@ -59,7 +60,7 @@ public class PdfImageInformation {
      * @param objectNum
      * @param genNum  
      */
-    public PdfImageInformation(String key, int width, int height, int objectNum, int genNum) {
+    public PdfImageInformation(String key, int width, int height, long objectNum, int genNum) {
         this.key = key;
         this.width = width;
         this.height = height;
@@ -110,17 +111,20 @@ public class PdfImageInformation {
         this.objectGenNum = objectGenNum;
     }
 
+    public void setFileName(String fileName) {this.fileName = fileName;}
+    public String getFileName() {return this.fileName;}
+
     /**
      * @return object number
      */
-    public int getObjectNum() {
+    public long getObjectNum() {
         return objectNum;
     }
 
     /**
      * @param objectNum number to be set as PDF object number
      */
-    public void setObjectNum(int objectNum) {
+    public void setObjectNum(long objectNum) {
         this.objectNum = objectNum;
     }
 

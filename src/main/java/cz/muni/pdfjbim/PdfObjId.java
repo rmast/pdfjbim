@@ -22,10 +22,10 @@ package cz.muni.pdfjbim;
  * @author Radim Hatlapatka (hata.radim@gmail.com)
  */
 public class PdfObjId {
-    private int objectNumber;
+    private long objectNumber;
     private int generationNumber;
 
-    public PdfObjId(int objectNumber, int generationNumber) {
+    public PdfObjId(long objectNumber, int generationNumber) {
         this.objectNumber = objectNumber;
         this.generationNumber = generationNumber;
     }
@@ -38,7 +38,7 @@ public class PdfObjId {
         this.generationNumber = generationNumber;
     }
 
-    public int getObjectNumber() {
+    public long getObjectNumber() {
         return objectNumber;
     }
 
@@ -73,12 +73,9 @@ public class PdfObjId {
 
     @Override
     public int hashCode() {
-        int hash = 5;
+        long hash = 5;
         hash = 97 * hash + this.objectNumber;
         hash = 97 * hash + this.generationNumber;
-        return hash;
+        return (int)hash;
     }
-
-
-
 }

@@ -19,27 +19,30 @@ package cz.muni.pdfjbim;
 
 import java.awt.geom.Point2D;
 import java.awt.image.BufferedImage;
+import java.awt.image.RenderedImage;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.util.*;
 
+import com.sun.org.apache.xpath.internal.objects.XObject;
 import org.apache.pdfbox.contentstream.PDFGraphicsStreamEngine;
-import org.apache.pdfbox.cos.COSName;
-import org.apache.pdfbox.cos.COSObject;
-import org.apache.pdfbox.cos.COSObjectKey;
-import org.apache.pdfbox.cos.COSStream;
+import org.apache.pdfbox.cos.*;
 import org.apache.pdfbox.io.IOUtils;
 import org.apache.pdfbox.pdmodel.PDDocument;
 import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageTree;
 import org.apache.pdfbox.pdmodel.PDResources;
+import org.apache.pdfbox.pdmodel.common.PDMetadata;
 import org.apache.pdfbox.pdmodel.encryption.AccessPermission;
 import org.apache.pdfbox.pdmodel.font.PDFont;
+import org.apache.pdfbox.pdmodel.graphics.PDXObject;
 import org.apache.pdfbox.pdmodel.graphics.color.PDColor;
 import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceGray;
 import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceRGB;
 import org.apache.pdfbox.pdmodel.graphics.color.PDPattern;
+import org.apache.pdfbox.pdmodel.graphics.form.PDFormXObject;
 import org.apache.pdfbox.pdmodel.graphics.form.PDTransparencyGroup;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImage;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
@@ -76,15 +79,15 @@ public final class ExtractImages
     private boolean noColorConvert;
     private String filePrefix;
 
-    private final Set<COSStream> seen = new HashSet<>();
+    private final Set<COSBase> seen = new HashSet<>();
     private int imageCounter = 1;
     private String key; // RM: Hier moet een key in.
-    private final List<String> namesOfImages = new ArrayList<>();
-    private final List<PdfImageInformation> originalImageInformations = new ArrayList<>();
-    HashSet<COSObjectKey> listOfKeys = new HashSet<>();
+///    private final List<String> namesOfImages = new ArrayList<>();
+    public final List<PdfImageInformation> originalImageInformations = new ArrayList<>();
+    long objectNum;
+    private int genNum;
 
-
-    private ExtractImages()
+    ExtractImages()
     {
     }
 
@@ -191,29 +194,65 @@ public final class ExtractImages
         System.exit(1);
     }
 
-    private void extract(String pdfFile, String password) throws IOException
+    public void extract(String pdfFile, String password) throws IOException
     {
+        if (filePrefix == null && pdfFile.length() > 4)
+        {
+            filePrefix = pdfFile.substring(0, pdfFile.length() - 4);
+        }
+        includeDensity = true;
+        List<RenderedImage> resultaat;
         PDDocument document = null;
         try
         {
             document = PDDocument.load(new File(pdfFile), password);
+
+
+//            resultaat = getImagesFromPDF(document);
+//
+//            for (RenderedImage renderedImage : resultaat) {
+//                System.err.println("Hallo " + renderedImage.getWidth() + " " + renderedImage.getHeight());
+//            }
+
+            for (COSObject cosObject : document.getDocument().getObjects()) {
+//                System.out.println(cosObject.getObjectNumber() + " " + cosObject.getGenerationNumber());
+//                    COSBase xObject = cosObject.getItem(COSName.XOBJECT);
+                    COSBase subtype = cosObject.getItem(COSName.SUBTYPE);
+                    if (subtype!=null && subtype.toString().equalsIgnoreCase("COSName{Image}")) {
+                        COSBase imageObj = cosObject.getObject();
+                        COSBase cosNameObj = cosObject.getItem(COSName.NAME);
+                        String key;
+                        if (cosNameObj != null) {
+                            String cosNameKey = cosNameObj.toString();
+                            int startOfKey = cosNameKey.indexOf("{") + 1;
+                            key = cosNameKey.substring(startOfKey, cosNameKey.length() - 1);
+                        } else {
+                            key = "im0";
+                        }
+                        objectNum = cosObject.getObjectNumber();
+                        genNum = cosObject.getGenerationNumber();
+                        System.out.println(objectNum + " " + genNum + " " + key);
+                        PDImageXObject image = (PDImageXObject) PDImageXObject.createXObject(imageObj,null);
+                        PdfImageInformation pdfImageInfo =
+                                new PdfImageInformation(key, image.getWidth(), image.getHeight(), objectNum, genNum);
+                        originalImageInformations.add(pdfImageInfo);
+
+
+
+                    }
+            }
+
             AccessPermission ap = document.getCurrentAccessPermission();
             if (! ap.canExtractContent())
             {
                 throw new IOException("You do not have permission to extract images");
             }
-            List<COSObject> lCosObj = document.getDocument().getObjects();
-            for (COSObject cosObject : lCosObj) {
-                if (cosObject.getObject() instanceof COSStream) {
-                    listOfKeys.add(new COSObjectKey(cosObject.getObjectNumber(), cosObject.getGenerationNumber()));
-                }
-            }
+
             for (PDPage page : document.getPages())
             {
                 ImageGraphicsEngine extractor = new ImageGraphicsEngine(page);
                 extractor.run();
             }
-
         }
         finally
         {
@@ -223,6 +262,42 @@ public final class ExtractImages
             }
         }
     }
+
+//    public List<RenderedImage> getImagesFromPDF(PDDocument document) throws IOException {
+//        List<RenderedImage> images = new ArrayList<>();
+//        for (PDPage page : document.getPages()) {
+//            images.addAll(getImagesFromResources(page.getResources()));
+//        }
+//
+//        return images;
+//    }
+//
+//    private List<RenderedImage> getImagesFromResources(PDResources resources) throws IOException {
+//        List<RenderedImage> images = new ArrayList<>();
+//
+//        for (COSName xObjectName : resources.getXObjectNames()) {
+//            PDXObject xObject = resources.getXObject(xObjectName);
+//            if (seen.contains(xObject.getCOSObject()))
+//            {
+//                // skip duplicate image
+//                continue;
+//            }
+//            seen.add(xObject.getCOSObject());
+//
+//            if (xObject instanceof PDFormXObject) {
+//                images.addAll(getImagesFromResources(((PDFormXObject) xObject).getResources()));
+//            } else if (xObject instanceof PDImageXObject) {
+////                images.add(((PDImageXObject) xObject).getImage());
+////                COSObject zooi = (COSBase)((PDImageXObject)xObject);
+////                System.out.println(xObject.getCOSObject().getCOSObject().toString() + zooi);
+//
+//            }
+//        }
+//
+//        return images;
+//    }
+
+
 
     private class ImageGraphicsEngine extends PDFGraphicsStreamEngine
     {
@@ -266,6 +341,7 @@ public final class ExtractImages
         @Override
         public void drawImage(PDImage pdImage) throws IOException
         {
+            COSBase cosNameName;
             if (pdImage instanceof PDImageXObject)
             {
                 if (pdImage.isStencil())
@@ -273,15 +349,14 @@ public final class ExtractImages
                     processColor(getGraphicsState().getNonStrokingColor());
                 }
                 PDImageXObject xobject = (PDImageXObject)pdImage;
-                if (seen.contains(xobject.getCOSObject()))
+                cosNameName = xobject.getCOSObject().getItem(COSName.NAME);
+                if (seen.contains(cosNameName))
                 {
                     // skip duplicate image
                     return;
                 }
-                seen.add(xobject.getCOSObject());
+                seen.add(cosNameName);
             }
-
-            // save image
             String name = filePrefix + "-" + imageCounter;
             imageCounter++;
 
@@ -420,7 +495,7 @@ public final class ExtractImages
 //          anyway and need a separate construction. The upcoming apache.commons.imaging could provide for
 //          a lossless, more speedy alternative for modifying metadata density chunks like EXIF JFIF & PhYS, or would
 //          including an external tool like mogrify/identify from ImageMagick be acceptable?
-
+//            System.out.println((pdImage.getCOSObject()));
             switch (dpi){
                 case 599 : dpi = 600; break;
                 case 299 : dpi = 300; break;
@@ -428,6 +503,7 @@ public final class ExtractImages
                 case 149 : dpi = 150; break;
                 case 99  : dpi = 100; break;
             }
+
 
             String suffix = pdImage.getSuffix();
             if (suffix == null || "jb2".equals(suffix))
@@ -559,12 +635,22 @@ public final class ExtractImages
                 }
             }
 
-            PdfImageInformation pdfImageInfo =
-                    new PdfImageInformation(key, pdImage.getWidth(), pdImage.getHeight(), 0,0);
-            originalImageInformations.add(pdfImageInfo);
+            PDImageXObject xobject = (PDImageXObject)pdImage;
+            COSBase cosNameName = xobject.getCOSObject().getItem(COSName.NAME);
 
-            namesOfImages.add(prefix + "." + suffix);
-
+            String key;
+            if (cosNameName != null) {
+                String cosNameKey = cosNameName.toString();
+                int startOfKey = cosNameKey.indexOf("{") + 1;
+                key = cosNameKey.substring(startOfKey, cosNameKey.length() - 1);
+            } else {
+                key = "im0";
+            }
+            for (PdfImageInformation originalImageInformation : originalImageInformations){
+                if (originalImageInformation.getKey().equals(key)){
+                    originalImageInformation.setFileName(prefix + "." + suffix);
+                }
+            }
         }
 
         private boolean hasMasks(PDImage pdImage) throws IOException

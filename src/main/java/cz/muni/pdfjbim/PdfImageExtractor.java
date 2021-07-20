@@ -25,19 +25,26 @@ import org.apache.pdfbox.cos.COSBase;
 import org.apache.pdfbox.cos.COSDocument;
 import org.apache.pdfbox.cos.COSName;
 import org.apache.pdfbox.cos.COSObject;
+import org.apache.pdfbox.io.IOUtils;
 import org.apache.pdfbox.io.RandomAccessRead;
 import org.apache.pdfbox.pdfparser.PDFParser;
+import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceGray;
+import org.apache.pdfbox.pdmodel.graphics.color.PDDeviceRGB;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImage;
 import org.apache.pdfbox.tools.imageio.ImageIOUtil;
 import org.apache.pdfbox.pdmodel.PDResources;
 import org.apache.pdfbox.pdmodel.common.PDStream;
 //import org.apache.pdfbox.pdmodel.graphics.xobject.PDImageXObject;
 import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.apache.pdfbox.util.Matrix;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.awt.image.BufferedImage;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Set;
 
@@ -101,8 +108,9 @@ log.info("extractImages 2");
         if (pdfFile.length() > 4) {
             prefix = pdfFile.substring(0, pdfFile.length() - 4);
         }
-
-        try (InputStream is = new FileInputStream(pdfFile)) {
+//PDFParser parser =new PDFParser(new org.apache.pdfbox.io.RandomAccessFile(file, "r"));
+//        try (InputStream is = new FileInputStream(pdfFile)) {
+        try (org.apache.pdfbox.io.RandomAccessFile is = new org.apache.pdfbox.io.RandomAccessFile(new File(pdfFile), "r")) {
             extractImagesUsingPdfParser(is, prefix, password, pagesToProcess, binarize);
         } catch (FileNotFoundException ex) {
             throw new PdfRecompressionException("File " + pdfFile + " doesn't exist", ex);
@@ -138,17 +146,17 @@ log.info("extractImages 4");
      *      processed because of output with inverted colors)
      * @throws PdfRecompressionException if problem to extract images from PDF
      */
-    public void extractImagesUsingPdfParser(InputStream is, String prefix, String password, Set<Integer> pagesToProcess,
+    public void extractImagesUsingPdfParser(org.apache.pdfbox.io.RandomAccessFile is, String prefix, String password, Set<Integer> pagesToProcess,
                                             Boolean binarize) throws PdfRecompressionException {
-//        // checking arguments and setting appropriate variables
-//        if (binarize == null) {
-//            binarize = false;
-//        }
-//
-//        log.debug("Extracting images (binarize set to {})", binarize);
-//
-//        InputStream inputStream = null;
-//        if (password != null) {
+        // checking arguments and setting appropriate variables
+        if (binarize == null) {
+            binarize = false;
+        }
+
+        log.debug("Extracting images (binarize set to {})", binarize);
+
+        org.apache.pdfbox.io.RandomAccessFile inputStream = null;
+        if (password != null) {
 //            try (ByteArrayOutputStream decryptedOutputStream = new ByteArrayOutputStream()) {
 //                PdfReader reader = new PdfReader(is, password.getBytes(StandardCharsets.UTF_8));
 //                PdfStamper stamper = new PdfStamper(reader, decryptedOutputStream);
@@ -161,108 +169,107 @@ log.info("extractImages 4");
 //            } catch (IOException ex) {
 //                throw new PdfRecompressionException("Reading file caused exception", ex);
 //            }
-//        } else {
-//            inputStream = is;
-//        }
-//
-//
-//        PDFParser parser = null;
-//        COSDocument doc = null;
-//        try {
-//            parser = new PDFParser(inputStream);
-//            parser.parse();
-//            doc = parser.getDocument();
-//
-//
-//            List<COSObject> objs = doc.getObjectsByType(COSName.XOBJECT);
-//            if (objs != null) {
-//                for (COSObject obj : objs) {
-//                    COSBase subtype = obj.getItem(COSName.SUBTYPE);
-//                    if (subtype.toString().equalsIgnoreCase("COSName{Image}")) {
-//                        COSBase imageObj = obj.getObject();
-//                        COSBase cosNameObj = obj.getItem(COSName.NAME);
-//                        String key;
-//                        if (cosNameObj != null) {
-//                            String cosNameKey = cosNameObj.toString();
-//                            int startOfKey = cosNameKey.indexOf("{") + 1;
-//                            key = cosNameKey.substring(startOfKey, cosNameKey.length() - 1);
-//                        } else {
-//                            key = "im0";
-//                        }
-//                        int objectNum = obj.getObjectNumber().intValue();
-//                        int genNum = obj.getGenerationNumber().intValue();
-//                        PDXObjectImage image = (PDXObjectImage) PDXObjectImage.createXObject(imageObj);
-//
-//                        PDStream pdStr = new PDStream(image.getCOSStream());
-//                        List<COSName> filters = pdStr.getFilters();
-//
-//                        log.debug("Detected image with color depth: {} bits", image.getBitsPerComponent());
-//                        if (filters == null) {
-//                            continue;
-//                        }
-//                        log.debug("Detected filters: {}", filters.toString());
-//
-//
-//                        if ((image.getBitsPerComponent() > 1) && (!binarize)) {
-//                            log.info("It is not a bitonal image => skipping");
-//                            continue;
-//                        }
-//
-//                        // at this moment for preventing bad output (bad coloring) from LZWDecode filter
-//                        if (filters.contains(COSName.LZW_DECODE)) {
-//                            log.info("This is LZWDecoded => skipping");
-//                            continue;
-//                        }
-//
-//                        if (filters.contains(COSName.FLATE_DECODE)) {
-//                            log.debug("FlateDecoded image detected");
-//                        }
-//
-//                        if (filters.contains(COSName.JBIG2_DECODE)) {
-//                            if (skipJBig2Images) {
-//                                log.warn("Allready compressed according to JBIG2 standard => skipping");
-//                                continue;
-//                            } else {
-//                                log.debug("JBIG2 image detected");
-//                            }
-//                        }
-//
-//                        // detection of unsupported filters by pdfBox library
-//                        if (filters.contains(COSName.JPX_DECODE)) {
-//                            log.warn("Unsupported filter JPXDecode => skipping");
-//                            continue;
-//                        }
-//
-//                        String name = getUniqueFileName(prefix, image.getSuffix());
-//                        log.info("Writing image: {}", name);
-//                        image.write2file(name);
-//
-//
-//                        PdfImageInformation pdfImageInfo =
-//                                new PdfImageInformation(key, image.getWidth(), image.getHeight(), objectNum, genNum);
-//                        originalImageInformations.add(pdfImageInfo);
-//
-//                        namesOfImages.add(name + "." + image.getSuffix());
-//
-//                    }
-//                }
-//            }
-//        } catch (IOException ex) {
-//            Tools.deleteFilesFromList(namesOfImages);
-//            throw new PdfRecompressionException("Unable to parse PDF document", ex);
-//        } catch (Exception ex) {
-//            Tools.deleteFilesFromList(namesOfImages);
-//        } finally {
-//            if (doc != null) {
-//                try {
-//                    doc.close();
-//                } catch (IOException ex) {
-//                    throw new PdfRecompressionException(ex);
-//                }
-//            }
-//        }
-    }
+        } else {
+            inputStream = is;
+        }
 
+
+        PDFParser parser = null;
+        COSDocument doc = null;
+        try {
+            parser = new PDFParser((RandomAccessRead) inputStream);
+            parser.parse();
+            doc = parser.getDocument();
+
+
+            List<COSObject> objs = doc.getObjectsByType(COSName.XOBJECT);
+            if (objs != null) {
+                for (COSObject obj : objs) {
+                    COSBase subtype = obj.getItem(COSName.SUBTYPE);
+                    if (subtype.toString().equalsIgnoreCase("COSName{Image}")) {
+                        COSBase imageObj = obj.getObject();
+                        COSBase cosNameObj = obj.getItem(COSName.NAME);
+                        String key;
+                        if (cosNameObj != null) {
+                            String cosNameKey = cosNameObj.toString();
+                            int startOfKey = cosNameKey.indexOf("{") + 1;
+                            key = cosNameKey.substring(startOfKey, cosNameKey.length() - 1);
+                        } else {
+                            key = "im0";
+                        }
+                        long objectNum = obj.getObjectNumber();
+                        int genNum = obj.getGenerationNumber();
+                        PDImageXObject image = (PDImageXObject) PDImageXObject.createXObject(imageObj,null);
+
+                        PDStream pdStr = new PDStream(image.getCOSObject());
+                        List<COSName> filters = pdStr.getFilters();
+
+                        log.debug("Detected image with color depth: {} bits", image.getBitsPerComponent());
+                        if (filters == null) {
+                            continue;
+                        }
+                        log.debug("Detected filters: {}", filters.toString());
+
+
+                        if ((image.getBitsPerComponent() > 1) && (!binarize)) {
+                            log.info("It is not a bitonal image => skipping");
+                            continue;
+                        }
+
+                        // at this moment for preventing bad output (bad coloring) from LZWDecode filter
+                        if (filters.contains(COSName.LZW_DECODE)) {
+                            log.info("This is LZWDecoded => skipping");
+                            continue;
+                        }
+
+                        if (filters.contains(COSName.FLATE_DECODE)) {
+                            log.debug("FlateDecoded image detected");
+                        }
+
+                        if (filters.contains(COSName.JBIG2_DECODE)) {
+                            if (skipJBig2Images) {
+                                log.warn("Allready compressed according to JBIG2 standard => skipping");
+                                continue;
+                            } else {
+                                log.debug("JBIG2 image detected");
+                            }
+                        }
+
+                        // detection of unsupported filters by pdfBox library
+                        if (filters.contains(COSName.JPX_DECODE)) {
+                            log.warn("Unsupported filter JPXDecode => skipping");
+                            continue;
+                        }
+
+                        String name = getUniqueFileName(prefix, image.getSuffix());
+                        log.info("Writing image: {}", name);
+                        //write2file(image,name, false, false, true);
+
+
+                        PdfImageInformation pdfImageInfo =
+                                new PdfImageInformation(key, image.getWidth(), image.getHeight(), objectNum, genNum);
+                        originalImageInformations.add(pdfImageInfo);
+
+                        namesOfImages.add(name + "." + image.getSuffix());
+
+                    }
+                }
+            }
+        } catch (IOException ex) {
+            Tools.deleteFilesFromList(namesOfImages);
+            throw new PdfRecompressionException("Unable to parse PDF document", ex);
+        } catch (Exception ex) {
+            Tools.deleteFilesFromList(namesOfImages);
+        } finally {
+            if (doc != null) {
+                try {
+                    doc.close();
+                } catch (IOException ex) {
+                    throw new PdfRecompressionException(ex);
+                }
+            }
+        }
+    }
 
     /**
      * get file name that is not used right now
@@ -280,4 +287,5 @@ log.info("extractImages 4");
         }
         return uniqueName;
     }
+
 }
