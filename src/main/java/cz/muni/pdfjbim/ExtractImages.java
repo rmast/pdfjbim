@@ -338,10 +338,9 @@ public final class ExtractImages
             }
         }
 
-        @Override
+       @Override
         public void drawImage(PDImage pdImage) throws IOException
         {
-            COSBase cosNameName;
             if (pdImage instanceof PDImageXObject)
             {
                 if (pdImage.isStencil())
@@ -349,14 +348,15 @@ public final class ExtractImages
                     processColor(getGraphicsState().getNonStrokingColor());
                 }
                 PDImageXObject xobject = (PDImageXObject)pdImage;
-                cosNameName = xobject.getCOSObject().getItem(COSName.NAME);
-                if (seen.contains(cosNameName))
+                if (seen.contains(xobject.getCOSObject()))
                 {
                     // skip duplicate image
                     return;
                 }
-                seen.add(cosNameName);
+                seen.add(xobject.getCOSObject());
             }
+
+            // save image
             String name = filePrefix + "-" + imageCounter;
             imageCounter++;
 
@@ -533,13 +533,13 @@ public final class ExtractImages
                     if (image != null)
                     {
                         int elements = image.getRaster().getNumDataElements();
-                        suffix = "png";
-                        if (elements > 3)
-                        {
+//                        suffix = "png";
+//                        if (elements > 3)
+//                        {
                             // More then 3 channels: Thats likely CMYK. We use tiff here,
                             // but a TIFF codec must be in the class path for this to work.
                             suffix = "tiff";
-                        }
+//                        }
                         out = new FileOutputStream(prefix + "." + suffix);
                         ImageIOUtil.writeImage(image, suffix, out, dpi);
                         out.flush();
